@@ -4,5 +4,5 @@ Is a script that is meant to glue together the pieces to spin up a single node K
 
 # Usage
 
-`makcro up` - start up a new cluster, container repo, and configure the cluster with the appropriate information to pull images from the container repo
-`makcro down` - stop AND delete the cluster and container repo
+- `makcro up` - start up a new cluster, container repo, and configure the cluster with the appropriate information to pull images from the container repo
+- `makcro down` - stop AND delete the cluster and container repo
