@@ -1,0 +1,97 @@
+#!/bin/bash
+# Manuel Nila 2024
+# https://github.com/manila/makcro
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+KIND_CLUSTER_NAME="makcro-cluster"
+REGISTRY_NAME="makcro-registry"
+REGISTRY_PORT="5000"
+KIND_BINARY_PATH="/tmp/kind"
+PLATFORM=""
+OS=""
+
+download_kind_binary() {
+  # For AMD64 / x86_64
+  [ $(uname -m) = x86_64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+  #TODO(manila): add support for macOS and ARM
+  # For ARM64
+  #[ $(uname -m) = aarch64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-arm64
+  # For Intel Macs
+  #[ $(uname -m) = x86_64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-darwin-amd64
+  # For M1 / ARM Macs
+  #[ $(uname -m) = arm64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-darwin-arm64
+}
+
+# Function to create the kind cluster
+create_kind_cluster() {
+  echo "Creating kind cluster..."
+  cat <<EOF | ${KIND_BINARY_PATH} create cluster --name "${KIND_CLUSTER_NAME}" --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+featureGates:
+  KubeletInUserNamespace: true
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${REGISTRY_PORT}"]
+    endpoint = ["http://${REGISTRY_NAME}:${REGISTRY_PORT}"]
+nodes:
+  - role: control-plane
+  - role: worker
+EOF
+  echo "Kind cluster created."
+}
+
+# Function to create the Docker container registry
+create_registry() {
+  echo "Creating Docker container registry..."
+  if [ "$(docker ps -q -f name="${REGISTRY_NAME}")" ]; then
+    echo "Registry already running."
+  else
+    docker run -d --restart=always -p "${REGISTRY_PORT}:5000" --name "${REGISTRY_NAME}" registry:2
+    echo "Docker container registry created."
+  fi
+}
+
+# Function to connect the registry to the kind cluster network
+connect_registry_to_network() {
+  #TODO(manila): clean this up
+  if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${reg_name}")" = 'null' ]; then
+    docker network connect "kind" "${reg_name}"
+  fi
+  #echo "Connecting registry to kind network..."
+  #docker network connect "kind" "${REGISTRY_NAME}" || true
+  #echo "Registry connected to kind network."
+}
+
+# Function to create a local registry configuration for kind
+configure_local_registry() {
+  echo "Configuring local registry..."
+  cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-registry-hosting
+  namespace: kube-public
+data:
+  localRegistryHosting.v1: |
+    host: "localhost:${REGISTRY_PORT}"
+    help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
+EOF
+  echo "Local registry configured."
+}
+
+# Main script
+main() {
+  #TODO(manila): add option to bring down and delete cluster and registry
+  download_kind_binary
+  create_kind_cluster
+  create_registry
+  connect_registry_to_network
+  configure_local_registry
+  echo "Kind cluster and Docker container registry are up and running."
+}
+
+main "$@"
