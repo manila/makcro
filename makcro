@@ -8,7 +8,7 @@ set -o pipefail
 
 KIND_CLUSTER_NAME="makcro-cluster"
 REGISTRY_NAME="makcro-registry"
-REGISTRY_PORT="5000"
+REGISTRY_PORT="5001"
 REGISTRY_DIR="/etc/containerd/certs.d/localhost:${REGISTRY_PORT}"
 KIND_BINARY_PATH="/tmp/kind"
 PLATFORM=""
@@ -24,7 +24,7 @@ download_kind_binary() {
   #[ $(uname -m) = x86_64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-darwin-amd64
   # For M1 / ARM Macs
   #[ $(uname -m) = arm64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-darwin-arm64
-  chmod +x "$KIND_BINARY_PATH"
+  chmod 775 "$KIND_BINARY_PATH"
 }
 
 # Function to create the kind cluster
@@ -38,7 +38,7 @@ featureGates:
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${REGISTRY_PORT}"]
-    endpoint = ["http://${REGISTRY_NAME}:${REGISTRY_PORT}"]
+    endpoint = ["http://${REGISTRY_NAME}:5000"]
 nodes:
   - role: control-plane
   - role: worker
@@ -60,8 +60,8 @@ create_registry() {
 # Function to connect the registry to the kind cluster network
 connect_registry_to_network() {
   #TODO(manila): clean this up
-  if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${reg_name}")" = 'null' ]; then
-    docker network connect "kind" "${reg_name}"
+  if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${REGISTRY_NAME}")" = 'null' ]; then
+    docker network connect "kind" "${REGISTRY_NAME}"
   fi
   #echo "Connecting registry to kind network..."
   #docker network connect "kind" "${REGISTRY_NAME}" || true
