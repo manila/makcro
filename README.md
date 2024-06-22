@@ -10,6 +10,7 @@ Is a script that is meant to glue together the pieces to spin up a single node K
 # Dependencies
 
 - `curl`
+- `docker`
 
 # Contributing
 
