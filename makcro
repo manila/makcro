@@ -9,13 +9,14 @@ set -o pipefail
 KIND_CLUSTER_NAME="makcro-cluster"
 REGISTRY_NAME="makcro-registry"
 REGISTRY_PORT="5000"
+REGISTRY_DIR="/etc/containerd/certs.d/localhost:${REGISTRY_PORT}"
 KIND_BINARY_PATH="/tmp/kind"
 PLATFORM=""
 OS=""
 
 download_kind_binary() {
   # For AMD64 / x86_64
-  [ $(uname -m) = x86_64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+  [ $(uname -m) = x86_64 ] && curl -Lo "$KIND_BINARY_PATH" https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
   #TODO(manila): add support for macOS and ARM
   # For ARM64
   #[ $(uname -m) = aarch64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-arm64
@@ -23,12 +24,13 @@ download_kind_binary() {
   #[ $(uname -m) = x86_64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-darwin-amd64
   # For M1 / ARM Macs
   #[ $(uname -m) = arm64 ] && curl -Lo $KIND_BINARY_PATH https://kind.sigs.k8s.io/dl/v0.23.0/kind-darwin-arm64
+  chmod +x "$KIND_BINARY_PATH"
 }
 
 # Function to create the kind cluster
 create_kind_cluster() {
   echo "Creating kind cluster..."
-  cat <<EOF | ${KIND_BINARY_PATH} create cluster --name "${KIND_CLUSTER_NAME}" --config=-
+  cat <<EOF | "${KIND_BINARY_PATH}" create cluster --name "${KIND_CLUSTER_NAME}" --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 featureGates:
@@ -83,6 +85,15 @@ EOF
   echo "Local registry configured."
 }
 
+configure_nodes() {
+  for node in $($KIND_BINARY_PATH get nodes --name=$KIND_CLUSTER_NAME); do
+    docker exec "${node}" mkdir -p "${REGISTRY_DIR}"
+    cat <<EOF | docker exec -i "${node}" cp /dev/stdin "${REGISTRY_DIR}/hosts.toml"
+  [host."http://${REGISTRY_NAME}:5000"]
+EOF
+  done
+}
+
 # Main script
 main() {
   #TODO(manila): add option to bring down and delete cluster and registry
@@ -91,6 +102,7 @@ main() {
   create_registry
   connect_registry_to_network
   configure_local_registry
+  configure_nodes
   echo "Kind cluster and Docker container registry are up and running."
 }
 
