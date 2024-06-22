@@ -1,6 +1,6 @@
 # Mani's Automated Kubernetes and Container Registry Orchestrator (MAKCRO)
 
-Is a script that is meant to glue together the pieces to spin up a single node Kubernetes Cluster and a Container Repository for local development or as part of a CI testing pipeline.
+Is a script that is meant to glue together the pieces to spin up a single node Kubernetes Cluster and a Container Registry for local development or as part of a CI testing pipeline.
 
 # Usage
 
